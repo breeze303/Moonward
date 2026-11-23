@@ -1,79 +1,84 @@
 # Moonward
 
-独立部署的邀请制聊天站。网页与 API 共用一个端口，模型生成由独立 Worker 执行。Docker 部署使用 PostgreSQL 17，无需额外网关账号系统或 Redis。
+可独立部署的 AI 聊天站，接入兼容 OpenAI Responses API 的模型网关。支持多用户、异步对话和个人记忆，网页与 API 共用一个端口。
 
-## 首次部署
+![Moonward 浅色模式聊天界面](docs/images/chat-light.webp)
 
-在项目目录用 Node.js 24 和 Docker Compose v2 执行。配置生成器只在 `.env` 不存在时写入并生成随机密钥。默认只监听本机；远程部署请先指定浏览器实际访问的 HTTPS 地址。
+## 功能
 
-[`.env.example`](.env.example) 列出了 Compose 使用的全部变量，不含可用密钥。推荐运行下方生成器创建私有 `.env`，不要直接复制空的密钥字段。管理员账号在 `/setup` 创建，上游 API Key 在站点管理中设置，两者都不需要写入 `.env`。
+- **聊天** — Markdown、代码高亮、公开思考摘要、推理深度调节，以及模型支持的联网搜索、图片和文档输入。
+- **异步生成** — 多个对话可同时回复，刷新页面后继续接收后台任务的输出；单轮请求最长 10 分钟。
+- **个人记忆** — 查看、编辑和删除已保存的记忆，新对话可选择停用；自动提取由管理员配置模型、用户自行开启。
+- **站点管理** — 在网页中配置 API、模型显示名称、上下文与输出上限，管理用户、邀请和每日配额。
+- **界面** — 深浅主题、移动端布局、自动话题命名，以及单文件 HTML 代码预览。预览支持内联样式，脚本和外部资源受限。
+
+## 界面预览
+
+以下截图均使用演示账号和模拟回复。
+
+<details>
+<summary>查看深色模式、记忆管理与手机界面</summary>
+
+### 深色模式
+
+![Moonward 深色模式聊天界面](docs/images/chat-dark.webp)
+
+### 记忆管理
+
+![Moonward 个人记忆设置](docs/images/memory.webp)
+
+### 手机界面
+
+<img src="docs/images/mobile.webp" alt="Moonward 手机聊天界面" width="320">
+
+</details>
+
+## 快速部署
+
+准备 Node.js 24 和 Docker Compose v2。下面的步骤适用于全新部署；已有数据库请先阅读[升级与备份说明](deploy/postgres.md#旧版升级)。
 
 ```bash
+git clone https://github.com/breeze303/Moonward.git
+cd Moonward
 node deploy/init-env.mjs
-docker compose up -d --build --wait
-docker compose ps
 ```
 
-新库会自动建表。在站点地址后加 `/setup`（例如 `http://localhost:18091/setup`），填写显示名称、邮箱和密码即可创建管理员，无需额外口令。初始化前任何能访问站点的人都可以提交，首个成功提交者成为管理员，请在部署后立即完成。创建后初始化接口关闭，后续访问 `/setup` 会返回首页，不能重设管理员。
+生成器创建含随机密钥的私有 `.env`，已有文件会保留。默认地址为 `http://localhost:18091`，监听 `127.0.0.1`。远程部署时，先按 [`.env.example`](.env.example) 编辑配置。
 
-## 账号管理
-
-在「设置 → 账号 → 站点管理 → 用户与用量」直接新增账号，或生成邀请链接交给用户注册。邀请限指定邮箱、一次有效、24 小时到期；重新生成会使同邮箱的旧链接失效。站点不发送邮件，也不提供自助密码重置。
-
-按名称或邮箱查找用户，编辑显示名称、邮箱、密码和每日请求上限。新设密码须为 10 至 128 个字符；改邮箱或重置密码会注销该账号的旧登录。停用会保留聊天记录，并可随时恢复；删除会永久移除该用户的账号、聊天、附件和站内用量记录。管理员账号不能被停用或删除。
-
-## 网络与维护
-
-生产部署只使用根目录的 `compose.yaml` 和 `.env`。首次运行前可向生成器提供 `APP_ORIGIN=https://chat.example.com`、`APP_ALLOWED_ORIGINS`、`PUBLISH_PORT` 和 `BIND_IP`；也可以生成后直接编辑 `.env`。再次运行生成器不会覆盖已有文件。应用只收到运行账号的数据库连接串，不会收到数据库管理员密码。
-
-同机代理用 `BIND_IP=127.0.0.1`。若需要路由器或 EasyTier 设备回源，使用内网地址或 `0.0.0.0` 并通过防火墙限制访问者。代理将整个站点转发到应用的 HTTP 端口（默认 18091），保留原始 Host 和 Origin，关闭 SSE 缓冲，读取超时至少 11 分钟。仅在必要时设置 `TRUST_PROXY` 为可信代理的地址。网站登录使用配置的 HTTPS 地址而非远程明文 HTTP；项目不自带 HTTPS 入口。
-
-使用 CDN 时，回源连接可以使用不同的地址或端口，但传给应用的 HTTP `Host` 必须是浏览器访问的域名（非默认端口也要一致）。不要用源站域名改写浏览器的 `Origin`，也不要缓存 `/api/*`。
+| 配置 | 用途 |
+| --- | --- |
+| `APP_ORIGIN` | 浏览器实际访问的地址，例如 `https://chat.example.com` |
+| `BIND_IP` | 同机反代使用 `127.0.0.1`；跨机器、局域网或 EasyTier 回源可设为内网 IP 或 `0.0.0.0` |
+| `PUBLISH_PORT` | 对外提供网页和 API 的单个端口，默认 `18091` |
 
 ```bash
+(umask 077 && mkdir -p ./data/postgres)
 docker compose up -d --build --wait
-curl -fsS http://127.0.0.1:18091/healthz
-docker compose ps
 ```
 
-数据库不发布宿主机端口。更改地址后重新执行 `docker compose up -d --wait` 即可；已有卷上的密码不能只改环境文件。保留卷和原密钥以延续数据。详见[数据库备份与并发验收](deploy/postgres.md)。
+1. 打开站点的 `/setup`，立即创建管理员。首个成功提交者成为管理员，完成后初始化入口关闭。
+2. 在「设置 → 账号 → 站点管理 → API 配置」填写网关地址和 API Key，再到「模型管理」添加并启用模型。
+3. 在「用户与用量」新增账号或生成邀请链接。密码长度为 10–128 个字符。
 
-## 数据与配额
+## 运行与维护
 
-- 聊天和附件跨设备同步，草稿文字按账号留在当前浏览器。删除聊天会删除同一会话的附件；不会退回已计的请求。`store: false` 不等于上游不保留任何数据。
-- 新对话首次回复成功后，Worker 用同一模型的短请求自动命名。请求只带有限长度的文字，不带附件或完整历史；不占用本站对话次数，但可能产生网关 token 费用。失败或者超时保留临时标题，已有标题和手动命名不被覆盖。
-- 默认每人/全站每日 30/200 次，按 UTC 重置。数据库默认容量为 100 个运行、200 个等待，可在后台调整；这是队列上限，不是已经达到的吞吐量。同一会话只允许一个活动任务。入队后计次，取消不保证上游停止计费。
-- 图片（PNG/JPEG/WebP）、PDF、UTF-8 TXT 单个最多 5 MiB；单轮和单个分支的发送上下文累计附件最多 10 MiB。
-- 账号、聊天、附件、网关和模型设置保存在 `moonward_pgdata`。备份使用 `pg_dump`，日常升级不要执行 `docker compose down -v`，它会删除数据库卷。
+- **反向代理** — 将整个站点转发到应用端口，保留浏览器域名对应的 `Host` 和原始 `Origin`。关闭 SSE 缓冲，读取超时至少 11 分钟。远程登录使用 HTTPS；CDN 跳过 `/api/*` 缓存。
+- **数据存储** — Docker 部署使用 PostgreSQL 17，账号、聊天、附件和设置统一保存在 `./data/postgres/`。用 `pg_dump` 备份数据库，同时保管原 `.env`；其中 `AUTH_SECRET` 用于解密网关密钥。
+- **更新** — 执行 `docker compose up -d --build --wait`，用 `docker compose ps` 检查服务。数据库迁移、旧卷迁移和并发验收见[部署文档](deploy/postgres.md)。
 
-## 异步生成
+## 开发与检查
 
-`POST /api/runs` 提交任务并返回 `202` 和任务 ID；`GET /api/runs/:id/events` 返回当前快照，再持续推送后续变更。刷新、断网或仅重启 `chat` 后，页面会重新订阅同一个任务，不会再次提交给模型。要单独更新网站，可执行 `docker compose up -d --no-deps chat`，不重建 Worker。
+```bash
+npm ci
+npm run dev           # 启动本地开发服务
+npm run type          # TypeScript 检查
+npm test              # 单元与接口测试
+npm run build         # 构建前端
+npm run test:browser  # Playwright 浏览器测试
+```
 
-单轮上游请求最长 10 分钟。Worker 重启前尚未领取的任务会继续处理；已领取的任务在 Worker 停止或失去租约后会标记为中断，保留已保存的文字，不会自动重发上游请求。
+浏览器测试使用本地模拟网关。可通过 `BROWSER_EXECUTABLE` 指定 Chrome，或先执行 `npx playwright install chromium`。PostgreSQL 专项测试需要[独立测试数据库](deploy/postgres.md#验收与恢复)。
 
-## API 网关、模型与推理
+## 许可证
 
-首次部署后，管理员在「设置 → 账号 → 站点管理 → API 配置」填写兼容 OpenAI Responses API 的基础地址（例如 `https://api.openai.com/v1`）和新签发的 API Key。生产环境仅允许访问公网 HTTPS 网关。保存会先验证网关模型列表，成功后立即生效，不需要重启。排队中或正在生成的任务结束后才能更改网关；更换地址须重新输入 Key，地址不变时留空保留现有 Key。
-
-在「模型管理」从网关列表选择模型或手动输入模型 ID，再设置显示名称、启用状态、默认模型、图片、文档、联网和允许的推理档位。聊天菜单只列出已启用且出现在网关模型列表的模型；默认模型暂不可用时回退到第一个可用模型。
-
-编辑模型可分别设置「上下文上限（字符）」和「最大输出（token）」，默认 120,000 字符和 8,192 tokens。上下文上限检查当前分支的历史正文和本次输入，超过时拒绝提交，不自动删减历史；附件仍按大小和能力校验。最大输出作为 `max_output_tokens` 发给网关；对忽略此参数的网关，站内缓存保护与模型配置的输出预算等比例变化。保存后新提交的任务使用新设置，已入队的任务保留原设置。
-
-空库不预置网关密钥或模型。API Key 加密保存，管理页面不回显。请在数据库之外安全备份 `AUTH_SECRET`；更换它后需要在后台重新输入 API Key。
-
-用户在输入框旁选择推理深度，选择按账号、模型保存在当前浏览器。选择「跟随默认」时使用管理员设定的档位；若未设定，站点不发送 `reasoning.effort`。只为模型启用其上游已验证的参数（`none`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max` 按模型和网关而异）。
-
-滑块、回复与输入框动画默认播放。搜索引用直接列在对应回复下方，可打开原网页。
-
-站点根据上游推理事件显示思考状态，仅保存和展示公开摘要。只在确认网关支持 `reasoning.summary: "auto"` 时为相应模型打开「请求公开思考摘要」；没有收到摘要时，不显示摘要面板。
-
-## HTML 预览
-
-模型完成回复后，标注为 `html` 的代码块可在「源码 / 预览」之间切换，复制仍返回原始源码。预览支持单文件 HTML、内联 CSS 和内嵌的常见位图；不执行 JavaScript，不加载外部资源，也不允许链接跳转或提交表单。
-
-## 检查
-
-`npm run type`、`npm test`、`npm run build`、`npm run test:browser`。浏览器测试在回环地址启独立 SQLite 和模拟网关，不消耗真实额度。Playwright 可用 `BROWSER_EXECUTABLE` 指定本机 Chrome，或运行 `npx playwright install chromium`。
-
-聊天布局、主题、Markdown 渲染及部分浏览器代码来自 DeepSeek 的 `chat-demo`，保留 [MIT 许可证](LICENSE)。`src/components/chat-demo/` 内的样式模块用于 OpenAI 前端，不依赖原站点或其 API。
+基于 [MIT 许可证](LICENSE) 发布。聊天布局、主题、Markdown 渲染及部分浏览器代码来自 DeepSeek 的 `chat-demo`。
