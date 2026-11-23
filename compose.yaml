@@ -31,8 +31,13 @@ services:
       POSTGRES_INITDB_ARGS: --auth-local=peer --auth-host=scram-sha-256
     networks: [storage]
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - type: bind
+        source: ./data/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
       - ./server/postgres/schema.sql:/opt/moonward/schema.sql:ro
+      - ./server/postgres/memory-v1.sql:/opt/moonward/memory-v1.sql:ro
       - ./deploy/bootstrap.sql:/docker-entrypoint-initdb.d/01-moonward.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "PGPASSWORD=\"$${APP_DB_PASSWORD}\" psql -h 127.0.0.1 -U moonward_app -XAt -d moonward -c 'SELECT id FROM site_settings WHERE id=1' | grep -qx 1"]
@@ -61,5 +66,3 @@ services:
 networks:
   storage:
     internal: true
-volumes:
-  pgdata:

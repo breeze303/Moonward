@@ -1,5 +1,5 @@
 import pg from 'pg'
-import { readFile } from 'node:fs/promises'
+import { freshSchema } from './schema.ts'
 import { loadConfig } from '../config.ts'
 import { transaction } from './queue.ts'
 
@@ -17,7 +17,7 @@ try {
       ).rowCount
     )
       throw new Error('Target must be empty')
-    await c.query(await readFile(new URL('./schema.sql', import.meta.url), 'utf8'))
+    await c.query(await freshSchema())
     await c.query(
       'INSERT INTO gateway_settings VALUES(1,0,\'https://api.openai.com/v1\',NULL); INSERT INTO model_catalog VALUES(1,0,\'{"models":[],"defaultId":null}\')',
     )

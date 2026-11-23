@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
-import { readFile } from 'node:fs/promises'
+import { freshSchema } from './schema.ts'
 import { createHash } from 'node:crypto'
 import pg from 'pg'
 import { GatewayStore } from '../gateway.ts'
@@ -68,7 +68,8 @@ export async function importSnapshot(source: string, target: pg.Client, secret: 
         ).rowCount
       )
         throw new Error('Target database must be empty')
-      await target.query(await readFile(new URL('./schema.sql', import.meta.url), 'utf8'))
+      await target.query(await freshSchema())
+      await target.query('ALTER TABLE messages DISABLE TRIGGER memory_new_message')
       const counts: Record<string, number> = {}
       for (const name of tables) {
         const columns = db
@@ -93,6 +94,7 @@ export async function importSnapshot(source: string, target: pg.Client, secret: 
       }
       // Strictly validate deferred branch references before publishing this database.
       await target.query('SET CONSTRAINTS ALL IMMEDIATE')
+      await target.query('ALTER TABLE messages ENABLE TRIGGER memory_new_message')
       await target.query('COMMIT')
       return counts
     } catch (error) {

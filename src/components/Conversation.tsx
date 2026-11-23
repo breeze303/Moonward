@@ -1,10 +1,10 @@
 import clsx from 'clsx'
-import { ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileText, Globe2, LoaderCircle, Paperclip, PencilLine, RotateCcw, Square, X } from 'lucide-react'
+import { ArrowUp, ArrowUpRight, BookX, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileText, Globe2, LoaderCircle, Paperclip, PencilLine, RotateCcw, Square, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, RefObject } from 'react'
 import { acceptedMime, DEFAULT_MODEL_LIMITS, MAX_MODEL_LIMITS } from '../../shared/contract.ts'
 import type { Citation, Effort, FileMime, FileView, Message, Model, Thinking } from '../../shared/contract.ts'
-import { label } from '../services/api/appClient.ts'
+import { api,errorText,label } from '../services/api/appClient.ts'
 import { copyText } from '../utils/clipboard.js'
 import assistantStyle from './chat-demo/AssistantMessage.module.css'
 import branchesStyle from './chat-demo/BranchSwitcher.module.css'
@@ -49,11 +49,12 @@ function ThinkingState({ thinking, running, onUpdate }: { thinking: Thinking; ru
   </details> : <div className="thinking-state">{status}</div>
 }
 
-export function MessageItem({ message, first, last, busy, contextLimit, branch, edit, retry, onUpdate, notify }: {
-  message: Message; first: boolean; last: boolean; busy: boolean; contextLimit: number
+export function MessageItem({ message, memoryOff, first, last, busy, contextLimit, branch, edit, retry, onUpdate, notify }: {
+  message: Message; memoryOff?:boolean; first: boolean; last: boolean; busy: boolean; contextLimit: number
   branch: (id: string) => void; edit: (id: string, text: string) => void; retry: (id: string) => void; onUpdate: () => void; notify: (text: string) => void
 }) {
   const [editing, setEditing] = useState(false)
+  const [undone,undo]=useState('')
   const [value, setValue] = useState(message.content)
   const tooLong = editing && value.trim().length > contextLimit
   const index = message.siblings.indexOf(message.id)
@@ -84,6 +85,8 @@ export function MessageItem({ message, first, last, busy, contextLimit, branch, 
       {[0, 1, 2].map((dot) => <span key={dot} className={assistantStyle.waitingDot} />)}
     </div>}
 
+    {message.savedMemory&&undone!==`${message.savedMemory.id}:${message.savedMemory.revision}`&&<details className="memory-note"><summary>已记住 · 查看</summary>{message.savedMemory.body} <button className="text-button" onClick={async()=>{const m=message.savedMemory!;try{await api(`/memory/${m.id}`,'POST',{action:'undo',revision:m.revision});undo(`${m.id}:${m.revision}`);notify('已撤销记忆变更')}catch(e){notify(errorText(e))}}}>撤销</button></details>}
+    {memoryOff&&user&&/^\s*(?:请?记住|remember\b)/i.test(message.content)&&<small className="memory-note">此对话不使用记忆，本条未保存到记忆。</small>}
     {message.status === 'queued' && <div className="reply-state" role="status">排队中</div>}
     {!user && message.status !== 'completed' && message.status !== 'queued' && !generating && <div className={message.error ? assistantStyle.notice : 'reply-state'}>{status}</div>}
     {!generating && message.citations.length > 0 && <CitationList citations={message.citations} />}
@@ -147,11 +150,12 @@ function DraftAttachment({ draft: { file, mime }, busy, remove }: { draft: Draft
   </div>
 }
 
-export function Composer({ home, text, change, files, add, remove, model, models, selectModel, effort, setEffort, web, setWeb, busy, disabled, preparing, generating, stopping, submit, stop, textarea }: {
+export function Composer({ home, text, change, files, add, remove, model, models, selectModel, effort, setEffort, web, setWeb, memoryAvailable, withoutMemory, setWithoutMemory, busy, disabled, preparing, generating, stopping, submit, stop, textarea }: {
   home: boolean
   text: string; change: (text: string) => void; files: DraftFile[]; add: (files: File[]) => void; remove: (index: number) => void
   model: Model | undefined; models: Model[]; selectModel: (id: string) => void; effort?: Effort; setEffort: (effort?: Effort) => void
   web: boolean; setWeb: (value: boolean) => void; busy: boolean; disabled: boolean; preparing: boolean; generating: boolean; stopping: boolean
+  memoryAvailable: boolean; withoutMemory: boolean; setWithoutMemory: (value: boolean) => void
   submit: () => void; stop: () => void; textarea: RefObject<HTMLTextAreaElement>
 }) {
   const input = useRef<HTMLInputElement>(null)
@@ -182,9 +186,16 @@ export function Composer({ home, text, change, files, add, remove, model, models
     {tooLong && <p className="input-limit" role="status">输入超过模型的上下文上限。</p>}
     <div className={clsx(inputStyle.functionRow, 'composer-toolbar')}>
       <div className={inputStyle.toggles}>
-        {model?.web && <button type="button" className={clsx(inputStyle.toggle, 'composer-search')}
+        {model?.web && <button type="button" className={clsx(inputStyle.toggle, 'composer-toggle composer-search')}
           aria-label="智能搜索" title={`智能搜索：${web ? '开启' : '关闭'}`} aria-pressed={web} disabled={locked} onClick={() => setWeb(!web)}>
           {web ? <Check size={14} aria-hidden="true" /> : <Globe2 size={14} aria-hidden="true" />}<span>智能搜索</span>
+        </button>}
+        {memoryAvailable && home && <button type="button"
+          className={clsx(inputStyle.toggle, 'composer-toggle composer-memory')}
+          aria-label="本对话不使用记忆" aria-pressed={withoutMemory} disabled={locked}
+          title={`本对话不使用记忆：${withoutMemory ? '开启' : '关闭'}`}
+          onClick={() => setWithoutMemory(!withoutMemory)}>
+          {withoutMemory ? <Check size={14} aria-hidden="true" /> : <BookX size={14} aria-hidden="true" />}<span>不使用记忆</span>
         </button>}
       </div>
       <div className={clsx(inputStyle.right, 'composer-actions')}>

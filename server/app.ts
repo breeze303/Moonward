@@ -19,6 +19,7 @@ import { PgChats, usagePG } from './postgres/chat.ts'
 import { pgAccounts } from './postgres/accounts.ts'
 import { PgGateway,PgCatalog } from './postgres/settings.ts'
 import { RunFeed } from './postgres/feed.ts'
+import { memoryRoutes } from './postgres/memory.ts'
 import { createUpstream } from './upstream.ts'
 import { decodeFiles, emailSchema, idSchema, invitationTokenSchema, limitSchema, nameSchema, passwordSchema, read, turnSchema, versionSchema } from './validation.ts'
 
@@ -167,7 +168,7 @@ async function routes(config:Config,options:{dev?:boolean},{db,accounts,store,ga
       if (!await accounts.hasAdmin()) throw new HttpError(401, 'setup_required')
       needsSetup = false
     }
-    res.json(await requireUser(req))
+    res.json({...await requireUser(req), memoryAvailable:db instanceof pg.Pool})
   })
   app.get('/api/models', async (req, res) => {
     await requireUser(req)
@@ -240,8 +241,9 @@ async function routes(config:Config,options:{dev?:boolean},{db,accounts,store,ga
     res.status(204).end()
   })
 
+  if(db instanceof pg.Pool)memoryRoutes(app,db,requireUser,requireAdmin)
   app.get('/api/chats', async (req, res) => { res.json(await store.list((await requireUser(req)).id)) })
-  app.post('/api/chats', async (req, res) => { res.status(201).json(await store.create((await requireUser(req)).id)) })
+  app.post('/api/chats', smallJson,async (req, res) => { const owner=(await requireUser(req)).id;const {memory}=read(z.strictObject({memory:z.boolean().optional()}),req.body??{});res.status(201).json(store instanceof PgChats?await store.create(owner,memory):await store.create(owner)) })
   app.get('/api/chats/:id', async (req, res) => { res.json(await store.read((await requireUser(req)).id, id(req))) })
   app.patch('/api/chats/:id', smallJson, async (req, res) => {
     const user = await requireUser(req)

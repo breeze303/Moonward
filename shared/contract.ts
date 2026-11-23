@@ -24,14 +24,16 @@ export type Thinking = { active: boolean; elapsedMs: number | null; summary: str
 export const MIN_PASSWORD_LENGTH = 10
 export const MAX_PASSWORD_LENGTH = 128
 export type Usage = { count: number; limit: number; day: string; inputTokens: number; outputTokens: number }
-export type User = { id: string; name: string; email: string; role: 'admin' | 'user'; usage: Usage }
+export type User = { id: string; name: string; email: string; role: 'admin' | 'user'; usage: Usage; memoryAvailable?:boolean }
 export type AdminUser = User & { disabled: boolean }
 export type AdminUserInput = { email: string; name: string; password: string; limit?: number }
 export type AdminUserPatch = Partial<AdminUserInput> & { disabled?: boolean }
 export type Capacity = { running: number; waiting: number }
 export type AdminAccountsView = { users: AdminUser[]; site: Usage; defaultUserLimit: number; capacity?:Capacity }
-export type ChatSummary = { id: string; title: string; version: number; updatedAt: number; titlePending?: true }
+export type ChatSummary = { id: string; title: string; version: number; updatedAt: number; titlePending?: true; memory?:boolean }
 export type Message = {
+  references?: string[]
+  savedMemory?: {id:string;body:string;revision:number}
   id: string
   role: 'user' | 'assistant'
   content: string
@@ -43,7 +45,7 @@ export type Message = {
   files: FileView[]
   siblings: string[]
 }
-export type Chat = ChatSummary & { messages: Message[]; activeRunId: string | null; cursor?: number }
+export type Chat = ChatSummary & { messages: Message[]; activeRunId: string | null; cursor?: number; memoryPending?:boolean }
 export type RunReceipt = { runId: string; chat: Chat }
 export type Turn = {
   chatId: string

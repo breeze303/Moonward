@@ -6,6 +6,8 @@ import { PgChats } from './chat.ts'
 import { PgGateway } from './settings.ts'
 import { append, claim, finish, recover, renew } from './queue.ts'
 import { claimTitle, finishTitle } from './titles.ts'
+import { recall } from './memory.ts'
+import { extractOne } from './memoryWorker.ts'
 import { createUpstream, ResponseAccumulator, chatTitleInstructions } from '../upstream.ts'
 import { HttpError } from '../errors.ts'
 import type { Thinking } from '../../shared/contract.ts'
@@ -95,6 +97,7 @@ export function pgWorker(db: Pool, config: Config, heartbeat = () => {}) {
     try {
       const destination = await gateway.connection()
       const input = await chats.input(job)
+      await recall(db,job,input).catch(()=>{})
       for await (const event of upstream.stream(
         input,
         { model: job.model, effort: job.effort ?? undefined, web: !!job.web, outputTokens: job.output_tokens },
@@ -151,6 +154,7 @@ export function pgWorker(db: Pool, config: Config, heartbeat = () => {}) {
       await wait(500)
     }
   })()
+  let nextExtraction=0, extracting=false
   const dispatch = (async () => {
     while (!shutdown.signal.aborted) {
       try {
@@ -175,6 +179,11 @@ export function pgWorker(db: Pool, config: Config, heartbeat = () => {}) {
             .finally(() => tasks.delete(task))
           tasks.add(task)
           continue
+        }
+        if(!extracting && Date.now()>=nextExtraction){
+          extracting=true;nextExtraction=Date.now()+2000
+          const task=extractOne(db,gateway,upstream,shutdown.signal).catch(()=>{}).finally(()=>{extracting=false;tasks.delete(task)})
+          tasks.add(task)
         }
       } catch {
         console.error('[postgres] dispatch unavailable')

@@ -52,6 +52,7 @@ export function Workspace({ user, updateUser, expired }: { user: User; updateUse
   const [toast, setToast] = useState('')
   const [quota, setQuota] = useState(user.usage)
   const [settings, setSettings] = useState(false)
+  const [withoutMemory,noMemory]=useState(false)
   const [accountError, setAccountError] = useState('')
   const [deleting, setDeleting] = useState<ChatSummary | null>(null)
   const [phases, setPhases] = useState<ReadonlyMap<string | null, Phase>>(() => new Map())
@@ -129,6 +130,12 @@ export function Workspace({ user, updateUser, expired }: { user: User; updateUse
       else handle(failure, setError)
     } finally { if (ticket === sequence.current) setLoading(false) }
   }, [handle, remember, scope])
+
+  useEffect(()=>{
+    if(!chat?.memoryPending||!selected||remoteRunId)return
+    const timer=window.setTimeout(()=>void loadChat(selected),2500)
+    return ()=>window.clearTimeout(timer)
+  },[chat,selected,remoteRunId,loadChat])
 
   const scrollEnd = useCallback(() => {
     const box = scroll.current
@@ -212,6 +219,7 @@ export function Workspace({ user, updateUser, expired }: { user: User; updateUse
 
   function choose(id: string | null) {
     if (!canChangeChat) return
+    noMemory(false)
     setManagement(false); setDrawer(false); setError('')
     if (id === selectedRef.current && (chat || !id)) return
     setLoading(false)
@@ -286,7 +294,7 @@ export function Workspace({ user, updateUser, expired }: { user: User; updateUse
       const encoded = action === 'send' ? await Promise.all(files.map(({ file, mime }) => encodeFile(file, mime))) : []
       if (execution.controller.signal.aborted) return
       if (!execution.chat) {
-        const created = await api<Chat>('/chats', 'POST', {}, execution.controller.signal)
+        const created = await api<Chat>('/chats', 'POST', user.memoryAvailable?{memory:!withoutMemory}:{}, execution.controller.signal)
         active.current.delete(key)
         key = created.id
         active.current.set(key, execution)
@@ -426,6 +434,7 @@ export function Workspace({ user, updateUser, expired }: { user: User; updateUse
         setLocal(`${scope}effort:${model.id}`, next ?? null)
       }}
       web={web} setWeb={setWeb} busy={busy} disabled={loading || mutating}
+      memoryAvailable={Boolean(user.memoryAvailable)} withoutMemory={withoutMemory} setWithoutMemory={noMemory}
       preparing={phase === 'preparing'} generating={chat?.id === selected && Boolean(chat?.activeRunId)} stopping={stopping}
       submit={() => void generate('send')} stop={() => void stop()} textarea={textarea} />
   </>
@@ -466,7 +475,7 @@ export function Workspace({ user, updateUser, expired }: { user: User; updateUse
           }}>
             {loading ? <div className="session-loading"><Loading label="正在加载对话..." /></div> : chat &&
               <div className={listStyle.column} ref={messageList}>
-                {chat.messages.map((message, index) => <MessageItem key={message.id} message={message} first={index === 0} last={index === chat.messages.length - 1}
+                {chat.messages.map((message, index) => <MessageItem key={message.id} message={message} memoryOff={chat.memory===false} first={index === 0} last={index === chat.messages.length - 1}
                   busy={busy || mutating} contextLimit={model?.limits?.contextChars ?? DEFAULT_MODEL_LIMITS.contextChars}
                   branch={(id) => void changeChat(chat, { selected: id })} edit={(id, value) => void generate('edit', id, value)}
                   retry={(id) => void generate('retry', id)} onUpdate={scrollEnd} notify={setToast} />)}
@@ -486,7 +495,7 @@ export function Workspace({ user, updateUser, expired }: { user: User; updateUse
         else collapseSidebar(false)
       }} manage={() => { setSettings(false); setManagement(true) }} signOut={() => void signOut()} />}
     {deleting && <Modal title="永久删除对话" close={() => { if (!mutating) setDeleting(null) }}>
-      <p className="modal-copy">删除后，该对话及其中上传的文件将不可恢复。确认删除吗？</p>
+      <p className="modal-copy">删除后，该对话及其中上传的文件将不可恢复。已单独保存的记忆会保留。确认删除吗？</p>
       <div className="modal-actions"><button className="button secondary" disabled={mutating} onClick={() => setDeleting(null)}>取消</button>
         <button className="button danger" disabled={mutating} onClick={() => void changeChat(deleting, null)}>删除</button></div>
     </Modal>}

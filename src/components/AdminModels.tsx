@@ -25,6 +25,8 @@ export function AdminModels({ changed }: { changed: () => void }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [extractor,setExtractor]=useState<{model:string|null;calls:number;failures:number}|null>(null)
+  useEffect(()=>{void api<NonNullable<typeof extractor>>('/admin/memory').then(setExtractor).catch(()=>{})},[])
 
   async function refreshCatalog() {
     setError(''); setNotice('')
@@ -56,6 +58,7 @@ export function AdminModels({ changed }: { changed: () => void }) {
   function closeEditor() { if (!pending) { setEditor(null); setError('') } }
 
   return <section aria-label="模型管理">
+    {extractor&&catalog&&<label>自动记忆提取模型 <select value={extractor.model??''} disabled={pending} onChange={async e=>{const model=e.target.value||null;setPending(true);try{await api('/admin/memory','PUT',{model});setExtractor({...extractor,model})}catch(e){setError(errorText(e))}finally{setPending(false)}}}><option value="">不提取</option>{catalog.models.filter(m=>m.enabled).map(m=><option key={m.id} value={m.id}>{m.label}</option>)}</select><small> 调用 {extractor.calls} · 失败 {extractor.failures}</small></label>}
     <div className={styles.toolbar}>
       <h2>模型目录</h2>
       <div className="actions">

@@ -6,6 +6,8 @@ import { setThemePreference, useThemePreference } from '../app/theme.ts'
 import type { ThemePreference } from '../app/theme.ts'
 import styles from './chat-demo/Settings.module.css'
 import { Modal, Notice } from './ui.tsx'
+import { MemorySettings } from './MemorySettings.tsx'
+import { BookOpen } from 'lucide-react'
 
 const themes = [
   { value: 'light', label: '浅色', Icon: Sun },
@@ -17,20 +19,21 @@ export function WorkspaceSettings({ user, usage, busy, close, search, manage, si
   user: User; usage: Usage; busy: boolean
   close: () => void; search: () => void; manage: () => void; signOut: () => void; error: string
 }) {
-  const [page, setPage] = useState<'general' | 'account'>('general')
+  const [page, setPage] = useState<'general' | 'account'|'memory'>('general')
   const preference = useThemePreference()
   const id = useId()
 
   return <Modal title="设置" close={close} className={clsx(styles.dialog, 'settings-modal')}>
     <div className={styles.dialogMain}>
       <nav className={styles.navigation} aria-label="设置分类">
+        {user.memoryAvailable&&<button type="button" className={clsx(styles.navItem,page==='memory'&&styles.navItemActive)} aria-pressed={page==='memory'} onClick={()=>setPage('memory')}><BookOpen size={16}/>记忆</button>}
         <button type="button" className={clsx(styles.navItem, page === 'general' && styles.navItemActive)} aria-pressed={page === 'general'}
           onClick={() => setPage('general')}><Settings size={16} />通用设置</button>
         <button type="button" className={clsx(styles.navItem, page === 'account' && styles.navItemActive)} aria-pressed={page === 'account'}
           onClick={() => setPage('account')}><UserRound size={16} />账号</button>
       </nav>
-      <section className={styles.content} aria-label={page === 'general' ? '通用设置' : '账号'}>
-        {page === 'general' ? <>
+      <section className={styles.content} aria-label={page === 'general' ? '通用设置' : page==='memory'?'记忆':'账号'}>
+        {page==='memory'?<MemorySettings/>:page === 'general' ? <>
           <div className={clsx(styles.cell, styles.row)}>
             <span className={styles.text}>历史对话</span>
             <button className="button secondary" type="button" onClick={search}><Search size={16} />搜索对话</button>

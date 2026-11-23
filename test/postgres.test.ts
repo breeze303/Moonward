@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { freshSchema } from '../server/postgres/schema.ts'
 import pg from 'pg'
 import { PgChats } from '../server/postgres/chat.ts'
 import { append, cancel, claim, finish, recover, replay } from '../server/postgres/queue.ts'
@@ -28,7 +28,7 @@ test(
     })
     try {
       await base.query(`CREATE SCHEMA ${schema}`)
-      await db.query(await readFile(new URL('../server/postgres/schema.sql', import.meta.url), 'utf8'))
+      await db.query(await freshSchema())
       await db.query(`INSERT INTO site_settings(id,daily_limit) VALUES(1,1000); INSERT INTO gateway_settings VALUES(1,0,'https://example.test',NULL);
       INSERT INTO "user"(id,name,email) VALUES('a','A','a@test'),('b','B','b@test'); INSERT INTO profiles(id,role,daily_limit) VALUES('a','user',1000),('b','user',1000)`)
       const store = new PgChats(db)
@@ -135,14 +135,15 @@ test(
 
 test(
   'PostgreSQL authenticated HTTP: queue, stop, reconnect and stream to completion',
-  { skip: !process.env.MOONWARD_TEST_DATABASE_URL, timeout: 30000 },
+  { skip: !process.env.MOONWARD_TEST_DATABASE_URL, timeout: 90000 },
   async () => {
     const schema = 'test_' + randomUUID().replaceAll('-', ''),
       url = new URL(process.env.MOONWARD_TEST_DATABASE_URL!)
     url.searchParams.set('options', `-c search_path=${schema}`)
     const base = new pg.Pool({ connectionString: process.env.MOONWARD_TEST_DATABASE_URL }),
       db = new pg.Pool({ connectionString: url.href })
-    const mock = await startMock(),
+    const gate=Promise.withResolvers<void>()
+    const mock = await startMock(0,{extract:async text=>{if(text.includes('延迟'))await gate.promise;return JSON.stringify({body:text,scope:'',topic:'format'})}}),
       server = createServer(),
       origin = await listen(server)
     const config = loadConfig({ AUTH_SECRET: randomUUID(), APP_ORIGIN: origin, USER_DAILY_LIMIT: '1000' })
@@ -150,7 +151,7 @@ test(
       worker: ReturnType<typeof pgWorker> | undefined
     try {
       await base.query(`CREATE SCHEMA ${schema}`)
-      await db.query(await readFile(new URL('../server/postgres/schema.sql', import.meta.url), 'utf8'))
+      await db.query(await freshSchema())
       await db.query(
         `INSERT INTO site_settings(id,daily_limit,running_limit) VALUES(1,1000,1);INSERT INTO gateway_settings VALUES(1,0,'https://example.test',NULL)`,
       )
@@ -177,7 +178,7 @@ test(
       async function api(path: string, method = 'GET', body?: unknown) {
         const r = await client.api(path, method, body)
         assert.ok(r.ok, `${path}: ${r.status} ${r.ok ? '' : await r.text()}`)
-        return r.json()
+        return r.status===204?null:r.json()
       }
       await api('/setup', 'POST', { name: 'Admin', email: adminEmail, password })
       await client.login()
@@ -224,8 +225,31 @@ test(
       }
       assert.ok(done)
       assert.equal(mock.bodies.length, 1)
-      await wait(50)
+      async function turn(text:string,memory=true,model='gpt-test-text'){
+        const c=await api('/chats','POST',{memory}),run=await api('/runs','POST',{chatId:c.id,version:0,action:'send',text,model})
+        const stream=await client.api(`/runs/${run.runId}/events`);await stream.text();return api(`/chats/${c.id}`)
+      }
+      const saved=await turn('记住：以后部署示例用 Docker Compose');assert.ok(saved.messages[0].savedMemory)
+      const m=(await api('/memory')).items[0];assert.equal(m.scope,'部署')
+      await api('/admin/users','POST',{name:'Second',email:'second@example.test',password});const other=await new BrowserlessClient(origin).login('second@example.test',password)
+      assert.deepEqual((await (await other.api('/memory')).json()).items,[]);assert.equal((await other.api(`/memory/${m.id}`,'POST',{action:'delete',revision:m.revision})).status,409)
+      assert.equal((await other.api('/admin/memory')).status,403)
+      models.push({...models[0],id:'gpt-6.2-sol'});await db.query('UPDATE model_catalog SET selection=$1',[JSON.stringify({models,defaultId:models[0].id})])
+      const recalled=await turn('怎么部署？',true,'gpt-6.2-sol');assert.deepEqual(recalled.messages.at(-1).references,[m.body]);assert.ok(JSON.stringify(mock.bodies.at(-1)?.input).includes(m.body))
+      for(const [q,mode] of [['写一首诗',true],['如何部署',false]] as const){await turn(q,mode);assert.ok(!JSON.stringify(mock.bodies.at(-1)?.input).includes(m.body))}
+      await turn('记住：只用 Podman',false);assert.equal((await api('/memory')).items.length,1)
+      await turn('记住：我的 API Key 是 test-credential');assert.equal((await api('/memory')).items.length,1)
+      const replacement=await turn('请记住：以后部署使用 Podman');const changed=replacement.messages[0].savedMemory;assert.equal(changed.id,m.id)
+      await api(`/memory/${m.id}`,'POST',{action:'undo',revision:changed.revision});assert.equal((await api('/memory')).items[0].body,m.body)
+      await api('/memory/settings','PATCH',{automatic:true});await turn('我喜欢用列表');assert.equal(mock.extractionBodies.length,0)
+      await api('/admin/memory','PUT',{model:'gpt-6.2-sol'});await turn('我喜欢简洁的列表');
+      for(let i=0;i<80&&(await api('/memory')).items.length<2;i++)await wait(150)
+      assert.equal((await api('/memory')).items.length,2);assert.equal(mock.extractionBodies.length,1);assert.equal(mock.extractionBodies[0].model,'gpt-6.2-sol');assert.equal(mock.extractionBodies[0].input.length,1)
+      await turn('我喜欢延迟更新的列表');for(let i=0;i<80&&mock.extractionBodies.length<2;i++)await wait(150)
+      assert.equal(mock.extractionBodies.length,2);await api('/memory','DELETE',{confirm:true});gate.resolve();await wait(500);assert.deepEqual((await api('/memory')).items,[])
+      await api('/memory/settings','PATCH',{enabled:false});await turn('记住：以后都用英文');assert.equal((await api('/memory')).items.length,0)
     } finally {
+      gate.resolve()
       await application?.drain()
       await worker?.close()
       await closeServer(server)

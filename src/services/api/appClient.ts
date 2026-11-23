@@ -2,6 +2,7 @@ import type { FileInput, ChatEvent, RunReceipt, Turn } from '../../../shared/con
 import { readServerSentEvents } from './sse.ts'
 
 const labels: Record<string, string> = {
+  memory_rejected:'记忆已关闭或内容可能包含敏感信息。',memory_limit:'最多可保存 200 条记忆。',
   queue_full: '等待队列已满，请稍后重试。',
   unauthenticated: '登录已过期，请重新登录。', disabled: '此账号已停用。', forbidden: '没有操作权限。',
   not_found: '找不到这项内容。', invalid_origin: '站点地址与服务器配置不一致。', invalid_input: '请检查输入后重试。',

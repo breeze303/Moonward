@@ -4,11 +4,32 @@
 
 ## 初始化与备份
 
-生产只使用项目根目录的一份 Compose 和一份环境文件，见[首次部署](../README.md)。首次启动时数据库容器在空卷上事务性建表，生成受限运行角色，并创建空的网关和模型目录。保留卷重启不会重新初始化。应用与 Worker 通过专用网络连接 PostgreSQL，不需要映射 5432。
+生产只使用项目根目录的一份 Compose 和一份环境文件，见[首次部署](../README.md)。全新部署时数据库容器在空的 `./data/postgres/` 内初始化数据库、事务性建表并生成受限运行角色。复用已初始化的数据目录时不会重新建库。应用与 Worker 通过专用网络连接 PostgreSQL，不需要映射 5432。
 
 备份目录应私有；在项目目录执行 `umask 077` 后使用 `docker compose exec -T -u postgres db pg_dump -Fc moonward > /protected/moonward.dump`。单独安全备份 `.env`。在隔离实例的空库（预先创建所需角色）用 `pg_restore --exit-on-error` 演练还原。不要用 SQLite 的备份命令处理生产数据库。
 
 可以用 `docker compose up -d --scale worker=2 --wait` 增加 Worker，但管理员设定的容量不是性能保证。以下是历史测试，不代表新部署已经通过百路并发验收。
+
+## 旧版升级
+
+### 从命名卷迁移到本地目录
+
+旧版使用 `moonward_pgdata` 命名卷。切换到当前 Compose 前，先备份原库并迁移到 `./data/postgres/`，完成数据核对后再清理原卷。Compose 挂载配置变更需要手动迁移数据。
+
+已有数据的部署应跳过 README 中创建空目录的步骤。挂载路径不存在时启动会报错，创建空目录后启动则会初始化空库。请先确认原卷位置和备份可还原，避免把空库当成迁移结果。
+
+### 更新记忆系统表结构
+
+升级已有 PostgreSQL 数据库时，先备份并暂停 Web 与 Worker，保留数据库运行，再由数据库所有者执行迁移。
+
+```bash
+docker compose stop chat worker
+docker compose exec -T -u postgres db psql -X -1 -v ON_ERROR_STOP=1 -d moonward < server/postgres/memory-v1.sql
+docker compose exec -T -u postgres db psql -X -d moonward -c 'TABLE moonward_migrations;'
+docker compose up -d --build --wait
+```
+
+确认迁移记录包含 `memory-v1` 后更新 Web 和 Worker。全新数据库会自动应用该结构；已有数据目录应按迁移流程升级。
 
 ## 验收与恢复
 

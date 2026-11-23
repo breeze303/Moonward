@@ -6,6 +6,7 @@ REVOKE ALL ON DATABASE moonward FROM PUBLIC;
 GRANT CONNECT ON DATABASE moonward TO moonward_app;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 \i /opt/moonward/schema.sql
+\i /opt/moonward/memory-v1.sql
 INSERT INTO site_settings(id,daily_limit) VALUES (1,200);
 INSERT INTO gateway_settings VALUES (1,0,'https://api.openai.com/v1',NULL);
 INSERT INTO model_catalog VALUES (1,0,'{"models":[],"defaultId":null}');

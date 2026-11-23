@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { fork, type ChildProcess } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { freshSchema } from '../server/postgres/schema.ts'
 import { setTimeout as sleep } from 'node:timers/promises'
 import pg from 'pg'
 import express from 'express'
@@ -104,7 +104,7 @@ let failure: unknown
 const percentile = (a: number[], q: number) => [...a].sort((x, y) => x - y)[Math.floor((a.length - 1) * q)]
 try {
   await base.query(`CREATE SCHEMA ${schema}`)
-  await db.query(await readFile(new URL('../server/postgres/schema.sql', import.meta.url), 'utf8'))
+  await db.query(await freshSchema())
   await db.query(
     `INSERT INTO site_settings(id,daily_limit) VALUES(1,10000);INSERT INTO gateway_settings VALUES(1,0,'https://example.test',NULL)`,
   )

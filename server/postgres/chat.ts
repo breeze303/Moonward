@@ -28,7 +28,7 @@ export async function usagePG(db: Conn, owner: string | null): Promise<Usage> {
   return { ...row, day, limit: policy.daily_limit } as Usage
 }
 
-const fields = `id,title,version,updated_at::float8 AS "updatedAt",(title_job_until>$2 OR
+const fields = `id,title,version,memory_enabled AS memory,updated_at::float8 AS "updatedAt",(title_job_until>$2 OR
   (title_job_until=-1 AND EXISTS(SELECT FROM title_jobs t WHERE t.chat_id=chats.id AND t.until_ms IS NULL))) AS "titlePending"`
 async function path(c: Conn, chat: string, leaf: string | null) {
   return (
@@ -130,16 +130,16 @@ export class PgChats {
       ])
     ).rows as ChatSummary[]
   }
-  async create(owner: string) {
+  async create(owner: string,memory=true) {
     const id = randomUUID()
     await transaction(this.db, async (c) => {
       await c.query('SELECT id FROM profiles WHERE id=$1 FOR UPDATE', [owner])
       if ((await c.query('SELECT count(*)::int AS n FROM chats WHERE owner_id=$1', [owner])).rows[0].n >= 300)
         throw new HttpError(409, 'chat_limit')
-      await c.query("INSERT INTO chats(id,owner_id,title,updated_at,title_job_until) VALUES($1,$2,'',$3,-1)", [
+      await c.query("INSERT INTO chats(id,owner_id,title,updated_at,title_job_until,memory_enabled) VALUES($1,$2,'',$3,-1,$4)", [
         id,
         owner,
-        Date.now(),
+        Date.now(),memory,
       ])
     })
     return this.read(owner, id)
@@ -174,6 +174,11 @@ export class PgChats {
           siblings,
         }),
       ) as Message[]
+      if(messages.length){
+        const byId=new Map(messages.map(m=>[m.id,m]));const ids=[...byId.keys()]
+        for(const r of (await c.query('SELECT reply,body FROM memory_references WHERE reply=ANY($1)',[ids])).rows)(byId.get(r.reply)!.references??=[]).push(r.body)
+        for(const r of (await c.query('SELECT source,id,body,revision FROM memories WHERE owner_id=$1 AND source=ANY($2)',[owner,ids])).rows)byId.get(r.source)!.savedMemory=r
+      }
       if (run && messages.length) {
         const {
           rows: [chunks],
@@ -185,7 +190,8 @@ export class PgChats {
         if (chunks.text) last.content = chunks.text
         if (chunks.thinking) last.thinking = JSON.parse(chunks.thinking)
       }
-      return { ...meta, messages, activeRunId: run?.id ?? null, cursor: run?.last_seq ?? 0 } as Chat
+      const pending=messages.length&&!run&&(await c.query(`SELECT FROM memory_jobs j JOIN profiles p ON p.id=j.owner_id JOIN site_settings s ON s.id=1 WHERE j.owner_id=$1 AND j.source=ANY($2) AND j.epoch=p.memory_epoch AND p.memory_enabled AND p.memory_auto AND s.memory_model=j.model AND j.state IN ('waiting','running') AND EXISTS(SELECT FROM messages r WHERE r.parent_id=j.source AND r.status='completed') LIMIT 1`,[owner,messages.map(m=>m.id)])).rowCount
+      return { ...meta, messages, memoryPending:!!pending, activeRunId: run?.id ?? null, cursor: run?.last_seq ?? 0 } as Chat
     })
   }
   private async lock(c: PoolClient, owner: string, id: string, version: number) {

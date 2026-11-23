@@ -35,9 +35,10 @@ export function closeServer(server: Server) {
 type RequestBody = { input: Array<{ role: string; content: unknown }>; instructions?: string; tools?: unknown[]; model: string; store: boolean; max_output_tokens: number; reasoning?: { effort?: string; summary?: string } }
 type TextPart = { type: string; text?: string }
 
-export async function startMock(port = 0, options: { key?: string; models?: string[]; title?: (text: string) => string | null | Promise<string | null> } = {}) {
+export async function startMock(port = 0, options: { key?: string; models?: string[]; title?: (text: string) => string | null | Promise<string | null>; extract?: (text:string)=>Promise<string|null> } = {}) {
   const bodies: RequestBody[] = []
   const titleBodies: RequestBody[] = []
+  const extractionBodies: RequestBody[] = []
   let aborted = 0
   const app = express()
   app.use(express.json({ limit: '15mb' }))
@@ -51,9 +52,10 @@ export async function startMock(port = 0, options: { key?: string; models?: stri
     const parts = Array.isArray(body.input.at(-1)?.content) ? body.input.at(-1)!.content as TextPart[] : []
     const prompt = parts.find((part) => part.type === 'input_text')?.text || ''
     const make = (event: object) => `data: ${JSON.stringify(event)}\r\n\r\n`
-    if (body.instructions === chatTitleInstructions) {
-      titleBodies.push(body)
-      const title = await options.title?.(prompt)
+    if (body.instructions === chatTitleInstructions || body.instructions?.startsWith('从本条用户原话')) {
+      const extracting=body.instructions!==chatTitleInstructions
+      ;(extracting?extractionBodies:titleBodies).push(body)
+      const title = extracting?await options.extract?.(prompt):await options.title?.(prompt)
       if (res.destroyed) return
       if (!title) { res.status(503).end(); return }
       res.set('Content-Type', 'text/event-stream; charset=utf-8').end(make({ type: 'response.completed', response: {
@@ -136,7 +138,7 @@ export async function startMock(port = 0, options: { key?: string; models?: stri
   })
   const server = createServer(app)
   const url = await listen(server, port)
-  return { url, bodies, titleBodies, aborted: () => aborted, close: () => closeServer(server) }
+  return { url, bodies, titleBodies, extractionBodies, aborted: () => aborted, close: () => closeServer(server) }
 }
 
 export async function startSite(upstream: string | null, opts: { port?: number; dbPath?: string; staticFiles?: boolean; siteLimit?: number; seed?: boolean; loopbackAlias?: boolean; worker?: boolean } = {}) {
