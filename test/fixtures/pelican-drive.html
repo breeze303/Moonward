@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pelican drive</title>
+  <style>body { margin: 0; background: #eff6fb; } svg { display: block; width: 100%; height: auto; }</style>
+</head>
+<body>
+  <svg id="pelican-drive" viewBox="0 0 480 224" role="img" aria-labelledby="scene-title" onload="void 0">
+    <title id="scene-title">Pelican driving a car</title>
+    <style>
+      .wheel { animation: spin 0.8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+    <defs>
+      <linearGradient id="sky" x2="0" y2="1">
+        <stop offset="0" stop-color="#9bdced"/><stop offset="1" stop-color="#e9f9f5"/>
+      </linearGradient>
+      <g id="wheel"><circle r="20" fill="#243146"/><circle r="11" fill="#e8edf1"/><path d="M-8 0h16M0-8v16" stroke="#43776d" stroke-width="3"/></g>
+      <path id="cloud-route" d="M48 39 H96"/>
+    </defs>
+    <rect width="480" height="224" fill="url(#sky)"/>
+    <path d="M0 132Q105 90 216 125T480 113V174H0Z" fill="#89b99d"/>
+    <g id="cloud" fill="#fff">
+      <path d="M0 8a10 10 0 0 1 15-8a14 14 0 0 1 23 5a10 10 0 0 1 12 10H0Z"/>
+      <animateMotion dur="2s" repeatCount="indefinite"><mpath href="#cloud-route"/></animateMotion>
+    </g>
+    <rect y="168" width="480" height="56" fill="#38485e"/>
+    <path d="M0 198H480" stroke="#fff3c9" stroke-width="3" stroke-dasharray="21 18"/>
+    <g id="car" transform="translate(22 0)">
+      <animateTransform attributeName="transform" type="translate" values="22 0;244 0;22 0" dur="4s" repeatCount="indefinite"/>
+      <path id="pelican" d="M76 131Q48 129 48 111Q54 91 79 101Q92 97 88 80Q85 60 101 57Q121 54 125 76L118 91Q122 109 111 128Z" fill="#fefaf0" stroke="#31465c" stroke-width="3"/>
+      <circle cx="112" cy="69" r="3" fill="#233a51"/>
+      <path d="M120 74L157 80Q139 98 115 88Z" fill="#f6b655" stroke="#a85023" stroke-width="2"/>
+      <path d="M66 109Q88 119 105 109Q100 131 78 126Z" fill="#9aaebd"/>
+      <path d="M16 129H124L143 119Q170 118 187 134L196 156Q196 175 175 176H25Q7 175 8 156Z" fill="#e3684d" stroke="#963b39" stroke-width="3"/>
+      <path d="M116 120L131 97H146" fill="none" stroke="#31465c" stroke-width="4" stroke-linecap="round"/>
+      <g transform="translate(51 175)"><use class="wheel" href="#wheel"/></g>
+      <g transform="translate(153 175)"><use class="wheel" href="#wheel"/></g>
+      <circle id="lamp" cx="185" cy="145" r="5" fill="#ffe5a3"><animate attributeName="r" values="5;8;5" dur="2s" repeatCount="indefinite"/></circle>
+    </g>
+    <image href="/preview-probe/svg-image.png"/>
+    <use id="remote-use" href="/preview-probe/sprite.svg#remote"/>
+    <use id="static-wheel" href="#wheel" x="-40" y="-40"><set attributeName="href" to="/preview-probe/animated.svg#remote"/></use>
+    <foreignObject><p>Excluded HTML</p></foreignObject>
+  </svg>
+</body>
+</html>

@@ -1,0 +1,39 @@
+.toolbar, .meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.toolbar { margin-bottom: 12px; }
+.toolbar h2 { font-size: 16px; }
+.meta { min-height: 38px; margin: 8px 0; color: var(--muted); font-size: 13px; }
+.modelList { padding: 0; margin: 0; list-style: none; border-top: 1px solid var(--line); }
+.modelList li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(168px, .55fr) auto; gap: 8px 14px; align-items: center; min-height: 64px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.identity { display: grid; min-width: 0; gap: 3px; overflow-wrap: anywhere; }
+.identity strong { font-size: 14px; }
+.identity code { color: var(--muted); font-size: 12px; }
+.status, .rowActions { display: flex; align-items: center; }
+.status { gap: 4px 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.rowActions { justify-content: end; gap: 2px; }
+.available { color: var(--ink); }
+.saved { display: flex; align-items: center; gap: 7px; margin-top: 12px; color: var(--muted); font-size: 13px; }
+.dialog:global(.modal) { width: 456px; border-radius: 8px; }
+.form { display: grid; gap: 12px; }
+.gateway { max-width: 540px; padding-block: 8px; }
+.gateway :global(.button) { min-width: 116px; }
+.form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.fields { display: grid; gap: 13px; }
+.fields > label:not(.check) { display: grid; gap: 5px; font-weight: 600; }
+.form input:not([type='checkbox']), .form select { width: 100%; min-width: 0; height: 38px; border: 1px solid var(--line); border-radius: 7px; padding: 0 9px; background: var(--bg); }
+.form input[readonly] { color: var(--muted); background: var(--surface); }
+.form legend { margin-bottom: 5px; padding: 0; font-weight: 600; }
+.checks { display: flex; flex-wrap: wrap; gap: 2px 16px; }
+.limits > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 152px), 1fr)); gap: 8px 12px; }
+.limits label { display: grid; gap: 5px; color: var(--muted); }
+.check { display: inline-flex; align-items: center; gap: 6px; min-height: 29px; }
+.check input { width: 15px; height: 15px; margin: 0; accent-color: var(--focus); }
+.footer { margin-top: 0; }
+.footer > :first-child:not(.button) { margin-inline-end: auto; }
+
+@media (max-width: 560px) {
+  .toolbar { gap: 8px; }
+  .toolbar :global(.actions) { gap: 2px; }
+  .modelList li { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 6px; }
+  .status { grid-column: 1; }
+  .rowActions { grid-column: 2; grid-row: 1 / 3; }
+}

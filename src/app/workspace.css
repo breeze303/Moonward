@@ -1,0 +1,192 @@
+.workspace {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  background-color: var(--dsw-alias-bg-base);
+}
+
+.workspace-main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-mask { padding: 0; border: 0; background: transparent; }
+
+.message-list { overflow: hidden; scrollbar-gutter: auto; }
+.conversation-scroll { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable both-edges; scrollbar-color: var(--scroll-color) transparent; }
+.session-loading { height: 100%; display: grid; place-items: center; }
+.chat-message { min-width: 0; overflow-wrap: anywhere; }
+.message-attachment { max-width: 100%; }
+.reply-state { margin-top: 8px; color: var(--subtle); line-height: 22px; }
+.input-limit { padding: 4px 8px; font-size: 12px; color: var(--muted); }
+.ds-markdown a.ds-markdown-cite { text-decoration: none; }
+
+.composer { position: relative; container-type: inline-size; }
+.composer:focus-within { border-color: var(--moon-focus-border); }
+.composer-dragging { border-color: var(--dsw-alias-brand-primary); }
+.composer-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--composer-radius) - 1px);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .45s ease, visibility 0s .45s;
+}
+.composer-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--moon-composer-glow) / .76),
+    inset 0 0 9px rgb(var(--moon-composer-glow) / .22),
+    0 0 8px 2px rgb(var(--moon-composer-glow) / .15),
+    0 0 16px 3px rgb(var(--moon-composer-glow) / .075);
+  animation: moonward-composer-breathe 4s ease-in-out infinite paused;
+}
+.composer[data-generating] .composer-glow { visibility: visible; opacity: 1; transition-delay: 0s; }
+.composer[data-generating] .composer-glow::after { animation-play-state: running; }
+@keyframes moonward-composer-breathe {
+  0%, 100% { opacity: .06; }
+  50% { opacity: 1; }
+}
+.composer textarea:focus-visible { outline: none; }
+.composer-actions { min-width: 0; }
+.composer .composer-search { gap: 6px; padding-inline: 9px; }
+.composer .composer-search[aria-pressed='true'] { background: var(--moon-search-fill); color: var(--moon-search-ink); border-color: var(--moon-search-border); }
+.composer-model { display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: clamp(105px, 38cqw, 216px); height: 34px; border: 0; border-radius: 8px; padding: 0 7px; background: transparent; color: var(--muted); font-size: 12px; }
+.composer-model:hover:not(:disabled), .composer-model[aria-expanded='true'] { background: var(--hover); color: var(--ink); }
+.composer-model:focus-visible { outline-offset: -2px; }
+.composer-model-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-model-effort { flex: none; min-inline-size: calc(2em + 6px); padding-inline-start: 5px; border-inline-start: 1px solid var(--line); color: var(--ink); font-size: 11px; text-align: center; white-space: nowrap; }
+.composer-model svg { flex: none; }
+.model-popover { position: fixed; z-index: 900; width: min(282px, calc(100vw - 24px)); overflow: auto; overscroll-behavior: contain; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--dsw-specific-menu); box-shadow: 0 14px 34px rgba(0, 0, 0, .18); }
+.model-popover[data-effort] { padding: 4px 6px; }
+.effort-model-list, .model-popover-back { display: flex; align-items: center; gap: 5px; padding: 6px 9px; min-height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 13px; }
+.effort-model-list { margin-inline: auto; min-height: 28px; padding-block: 4px; font-weight: 600; transition: background-color .16s ease, color .16s ease; }
+.effort-model-list:hover, .model-popover-back:hover { background: var(--hover); }
+.model-popover-option { min-height: 37px; line-height: 19px; text-align: start; }
+.model-popover-option:focus-visible { outline-offset: -2px; }
+.effort-scale { --effort-thumb: 40px; position: relative; }
+.effort-rail { position: absolute; inset: 0 calc(var(--effort-thumb) / 2); pointer-events: none; }
+/* The opaque 17.5px lunar disc covers the full height of the rail's color split. */
+.effort-track { position: absolute; inset-inline: 0; top: 50%; height: 16px; overflow: hidden; transform: translateY(-50%); border-radius: 999px; background: var(--moon-effort-track); }
+.effort-track-fill { display: block; width: var(--effort-progress); height: 100%; background: var(--moon-effort-fill); }
+.effort-scale[data-max] .effort-track-fill { position: relative; background: linear-gradient(90deg, var(--moon-effort-fill), var(--moon-effort-peak)); }
+.effort-track-spark { display: none; }
+.effort-moon { position: absolute; top: 50%; left: var(--effort-progress); width: var(--effort-thumb); height: var(--effort-thumb); transform: translate(-50%, -50%); color: var(--moon-effort-ink); }
+.effort-moon-unlit { fill: var(--moon-effort-track); }
+.effort-moon-shadow { transform: translateX(calc(5.2px + 16.8px * var(--effort-phase))); }
+.effort-moon-stars { transform: rotate(calc(-40deg * var(--effort-phase))); transform-origin: center; transform-box: view-box; }
+.effort-moon-stars > :nth-child(1) { opacity: clamp(0, calc(2 * var(--effort-phase)), 1); }
+.effort-moon-stars > :nth-child(2) { opacity: clamp(0, calc(1.8 * var(--effort-phase) - .65), .78); }
+.effort-moon-stars > :nth-child(3) { opacity: clamp(0, calc(2 * var(--effort-phase) - 1.25), .57); }
+.effort-range { position: relative; z-index: 1; display: block; appearance: none; width: 100%; height: 44px; margin: 0; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: grab; touch-action: none; }
+.effort-range:active { cursor: grabbing; }
+.effort-range:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* The transparent native track is thumb-height so both tracks share a centerline. */
+.effort-range::-webkit-slider-runnable-track { height: var(--effort-thumb); background: transparent; }
+.effort-range::-moz-range-track { height: var(--effort-thumb); background: transparent; }
+.effort-range::-webkit-slider-thumb { appearance: none; width: var(--effort-thumb); height: var(--effort-thumb); border: 0; background: transparent; }
+.effort-range::-moz-range-thumb { box-sizing: border-box; width: var(--effort-thumb); height: var(--effort-thumb); border: 0; background: transparent; }
+.effort-scale :is(.effort-moon-shadow, .effort-moon-stars) { transition: transform .24s ease-out; }
+.effort-scale .effort-moon-stars > * { transition: opacity .24s ease-out; }
+.reply-moon { display: block; color: var(--dsw-alias-brand-text); }
+.reply-moon-shadow { animation: moonward-lunar-phase 3.8s ease-in-out infinite; }
+.reply-moon-stars {
+  transform-origin: center;
+  transform-box: view-box;
+  animation: moonward-star-orbit 6.8s linear infinite;
+}
+.effort-scale[data-max] .effort-moon-shadow { animation: moonward-lunar-phase 3.8s -2.1s ease-in-out infinite; }
+.effort-scale[data-max] .effort-moon-stars { animation: moonward-star-orbit 6.8s linear infinite; }
+.effort-scale .effort-track-spark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  color: #fff;
+  animation: moonward-rail-flight 3.6s -.2s linear infinite;
+}
+.effort-track-spark svg { filter: drop-shadow(0 0 2px #fffd); }
+.effort-track-spark:nth-child(2) { top: -5px; animation-delay: -1.4s; }
+.effort-track-spark:nth-child(3) { top: 5px; animation-delay: -2.6s; }
+@keyframes moonward-lunar-phase {
+  0%, 100% { transform: translateX(6px); }
+  54%, 68% { transform: translateX(22px); }
+}
+@keyframes moonward-star-orbit { to { transform: rotate(1turn); } }
+@keyframes moonward-rail-flight {
+  from { transform: translateX(-8px); opacity: 0; }
+  14%, 76% { opacity: .95; }
+  to { transform: translateX(calc(100% - 6px)); opacity: 0; }
+}
+.thinking-state { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+.thinking-state summary, .thinking-label { display: inline-flex; align-items: center; gap: 6px; }
+@supports (background-clip: text) {
+  .thinking-shimmer {
+    background-image: linear-gradient(100deg, var(--muted) 40%, var(--moon-thinking-shine) 50%, var(--muted) 60%);
+    background-size: 300% 100%;
+    background-clip: text;
+    color: transparent;
+    animation: moonward-thinking-shimmer 2.4s linear infinite;
+  }
+}
+@keyframes moonward-thinking-shimmer {
+  from { background-position: 100% 50%; }
+  to { background-position: 0% 50%; }
+}
+@media (forced-colors: active) {
+  .thinking-shimmer { color: inherit; animation: none; }
+}
+.thinking-state summary { cursor: pointer; padding: 4px 0; min-height: 26px; }
+.thinking-state summary::-webkit-details-marker { display: none; }
+.thinking-state[open] summary > svg { transform: rotate(180deg); }
+.thinking-summary { overflow-wrap: anywhere; max-height: 240px; overflow: auto; overscroll-behavior: contain; border-inline-start: 2px solid var(--line); padding: 4px 10px; margin: 4px 0 10px; }
+.thinking-summary > .ds-markdown { font: inherit; line-height: 1.55; color: inherit; }
+.thinking-summary .ds-markdown :is(h1, h2, h3, h4, h5, h6) { font: inherit; font-weight: 600; }
+.thinking-summary .ds-markdown :is(h1, h2, h3, h4, h5, h6, .ds-markdown-paragraph, ol, ul, hr) { margin-block: 6px; }
+.thinking-summary .ds-markdown li::marker { line-height: inherit; }
+.thinking-summary .ds-markdown > :first-child { margin-block-start: 0; }
+.thinking-summary .ds-markdown > :last-child { margin-block-end: 0; }
+.draft-remove:focus-visible { opacity: 1; }
+.model-feedback { display: flex; align-items: center; gap: 4px; width: 100%; margin-bottom: 6px; }
+.model-feedback > .notice { flex: 1; }
+
+.modal.settings-modal { width: 760px; height: 500px; padding: 19px 24px 22px; }
+.theme-radio { position: relative; }
+.theme-radio input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; }
+.theme-radio:has(:focus-visible) { box-shadow: 0 0 0 2px var(--focus); }
+.settings-account-actions { flex-wrap: wrap; }
+
+@container (width < 400px) {
+  .composer .composer-toolbar { gap: 4px; padding-inline: 8px; }
+  .composer .composer-search { padding-inline: 7px; }
+  .composer-model { max-width: clamp(86px, 33cqw, 132px); padding-inline: 4px; }
+}
+
+@media (hover: none) {
+  .chat-message .chat-message-actions, .draft-remove:not(:disabled) { opacity: 1; }
+}
+
+@media (width < 768px) {
+  .workspace { position: fixed; top: var(--app-viewport-top, 0px); bottom: auto; height: var(--app-viewport-height, 100dvh); }
+  .conversation-scroll { scrollbar-gutter: auto; }
+  .modal.settings-modal { inset: auto 0 0; margin: 0; width: 100%; max-width: none; height: calc(100% - 64px); max-height: 800px; border-radius: 24px 24px 0 0; }
+  .theme-radio { min-width: 92px; padding: 16px 8px; }
+}
+
+@media (width < 400px) {
+  .model-popover[data-effort] { width: calc(100vw - 16px); }
+}
+
+@media (height < 480px) {
+  .composer .composer-text { min-height: 42px; }
+  .composer .composer-mirror { max-height: max(42px, calc(var(--app-viewport-height, 100dvh) - 225px)); }
+}

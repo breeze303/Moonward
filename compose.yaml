@@ -1,0 +1,65 @@
+name: moonward
+
+x-app: &app
+  image: moonward-app:local
+  pull_policy: never
+  init: true
+  restart: unless-stopped
+  stop_grace_period: 20s
+  depends_on:
+    db:
+      condition: service_healthy
+  networks: [default, storage]
+  environment:
+    HOST: 0.0.0.0
+    PORT: 8090
+    APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
+    APP_ALLOWED_ORIGINS: ${APP_ALLOWED_ORIGINS:-}
+    AUTH_SECRET: ${AUTH_SECRET:?Generate .env first}
+    DATABASE_URL: postgresql://moonward_app:${APP_DB_PASSWORD:?Generate .env first}@db:5432/moonward
+    TRUST_PROXY: ${TRUST_PROXY:-}
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_DB: moonward
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate .env first}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Generate .env first}
+      POSTGRES_INITDB_ARGS: --auth-local=peer --auth-host=scram-sha-256
+    networks: [storage]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./server/postgres/schema.sql:/opt/moonward/schema.sql:ro
+      - ./deploy/bootstrap.sql:/docker-entrypoint-initdb.d/01-moonward.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=\"$${APP_DB_PASSWORD}\" psql -h 127.0.0.1 -U moonward_app -XAt -d moonward -c 'SELECT id FROM site_settings WHERE id=1' | grep -qx 1"]
+      start_period: 5m
+      interval: 5s
+      timeout: 4s
+      retries: 18
+  chat:
+    <<: *app
+    build: .
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${PUBLISH_PORT:-18091}:8090"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8090/healthz').then(r=>{if(!r.ok)process.exit(1)},()=>process.exit(1))"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+  worker:
+    <<: *app
+    command: ["node", "server/postgres/main.ts", "--worker"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "if(Date.now()-require('node:fs').statSync('/tmp/wenji-worker-ready').mtimeMs>5000)process.exit(1)"]
+      interval: 5s
+      timeout: 4s
+      retries: 6
+networks:
+  storage:
+    internal: true
+volumes:
+  pgdata:
